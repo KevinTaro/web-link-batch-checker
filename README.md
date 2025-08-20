@@ -7,6 +7,21 @@
 ## 資料夾結構
 
 ```
+
+## 授權條款
+本專案採用 MIT License 授權。詳見 [LICENSE](LICENSE) 檔案。
+
+## 貢獻方式
+歡迎提出 Pull Request 或 Issue，協助改進本工具。
+
+## 問題回報
+如有 bug 或建議，請至 [Issues](https://github.com/KevinTaro/web-link-batch-checker/issues) 回報。
+
+## 聯絡方式
+如需協助或有其他問題，請於 Issues 留言或 email 至 kevin.taro@example.com。
+
+---
+> 本專案公開於 GitHub Public Repository，請勿上傳敏感或私人資料。
 output/
   ├── csv/      # 每個網頁的原始連結資料 CSV
   ├── xlsx/     # 合併後的 Excel 檔案
