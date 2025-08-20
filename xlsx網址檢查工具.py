@@ -2,13 +2,27 @@ import pandas as pd
 import requests
 from openpyxl import load_workbook
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def check_url(url):
+
+def check_url(url, timeout=5):
     try:
-        resp = requests.get(url, timeout=10)
+        resp = requests.get(url, timeout=timeout)
         return 'OK' if resp.status_code == 200 else f'HTTP {resp.status_code}'
     except requests.exceptions.RequestException as e:
         return str(e)
+
+def batch_check_urls(urls, max_workers=16, timeout=5):
+    results = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_url = {executor.submit(check_url, url, timeout): url for url in urls}
+        for future in as_completed(future_to_url):
+            url = future_to_url[future]
+            try:
+                results[url] = future.result()
+            except Exception as exc:
+                results[url] = str(exc)
+    return results
 
 def main():
     xlsx_file = input('請輸入要檢查的 xlsx 檔案名稱：').strip()
@@ -30,12 +44,18 @@ def main():
         # 新增結果欄位
         result_col = ws.max_column + 1
         ws.cell(row=header_row, column=result_col, value='網址檢查結果')
-        # 檢查每一列網址
+        # 批次收集所有網址
+        urls = []
+        row_url_map = {}
         for row in range(header_row+1, ws.max_row+1):
             url = ws.cell(row=row, column=url_col).value
             if url:
-                result = check_url(url)
-                ws.cell(row=row, column=result_col, value=result)
+                urls.append(url)
+                row_url_map[row] = url
+        # 批次檢查
+        results = batch_check_urls(urls)
+        for row, url in row_url_map.items():
+            ws.cell(row=row, column=result_col, value=results.get(url, ''))
     out_path = os.path.join('output', 'checked', f'檢查結果_{os.path.basename(xlsx_file)}')
     wb.save(out_path)
     print(f'已完成檢查，結果儲存為 {out_path}')
@@ -68,11 +88,16 @@ def run_project():
             continue
         result_col = ws.max_column + 1
         ws.cell(row=header_row, column=result_col, value='網址檢查結果')
+        urls = []
+        row_url_map = {}
         for row in range(header_row+1, ws.max_row+1):
             url = ws.cell(row=row, column=url_col).value
             if url:
-                result = check_url(url)
-                ws.cell(row=row, column=result_col, value=result)
+                urls.append(url)
+                row_url_map[row] = url
+        results = batch_check_urls(urls)
+        for row, url in row_url_map.items():
+            ws.cell(row=row, column=result_col, value=results.get(url, ''))
     out_path = os.path.join('output', 'checked', f'檢查結果_{xlsx_file}')
     wb.save(out_path)
     print(f'已完成檢查，結果儲存為 {out_path}')

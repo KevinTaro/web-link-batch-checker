@@ -6,51 +6,36 @@ from datetime import datetime
 import os
 import glob
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def get_webpage_links(url):
     """
     抓取網頁上的所有標題和連結
     """
     try:
-        # 發送請求
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
-
-        # 解析HTML
         soup = BeautifulSoup(response.text, 'html.parser')
-
-        # 抓取所有 h2.Index_title 標題
         h2_titles = [h2.get_text(strip=True) for h2 in soup.find_all('h2', class_='Index_title')]
-
-        # 抓取所有 a 標籤
         links = soup.find_all('a')
-
-        # 整理成「標題」「網址」「title屬性」「另開新視窗」「Index_title」
         data = []
         for link in links:
             a_text = link.get_text(strip=True)
             href = link.get('href')
             a_title = link.get('title') if link.has_attr('title') else ''
             target_blank = '是' if link.get('target') == '_blank' else ''
-
-            # 忽略 javascript 連結
             if href and not href.strip().lower().startswith('javascript:'):
                 absolute_url = urllib.parse.urljoin(url, href)
                 if not a_text:
                     a_text = href
-
                 index_title = h2_titles[0] if h2_titles else ''
                 data.append([a_text, absolute_url, a_title, target_blank, index_title])
-
-        # 另外把所有 h2.Index_title 也加進資料（不重複）
         for h2_title in h2_titles:
             data.append([h2_title, '', '', '', h2_title])
-
         return data
-
     except requests.exceptions.RequestException as e:
         print(f"網頁請求錯誤: {e}")
         return []
@@ -128,22 +113,29 @@ def main():
         if url:
             urls.append(url)
 
-    for url in urls:
+    # 多執行緒批次抓取所有網址
+    def fetch_one(url):
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
-        print(f"正在抓取: {url}")
         data = get_webpage_links(url)
-        if not data:
-            print("沒有找到任何連結，或抓取失敗")
-            continue
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        domain = urllib.parse.urlparse(url).netloc
-        filename = os.path.join('output', 'csv', f"網頁連結_{domain}_{timestamp}.csv")
-        if save_to_csv(data, filename):
-            print(f"檔案已儲存為: {filename}")
-            print("可以用 Excel 開啟此檔案")
-            csv_files.append(filename)
-        print("-" * 50)
+        return url, data
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_url = {executor.submit(fetch_one, url): url for url in urls}
+        for future in as_completed(future_to_url):
+            url, data = future.result()
+            if not data:
+                print(f"{url} 沒有找到任何連結，或抓取失敗")
+                continue
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            domain = urllib.parse.urlparse(url).netloc
+            filename = os.path.join('output', 'csv', f"網頁連結_{domain}_{timestamp}.csv")
+            if save_to_csv(data, filename):
+                print(f"檔案已儲存為: {filename}")
+                print("可以用 Excel 開啟此檔案")
+                csv_files.append(filename)
+            print("-" * 50)
 
     # 結束時打包成 xlsx
     if csv_files:
@@ -153,24 +145,18 @@ def main():
         with pd.ExcelWriter(xlsx_name, engine='openpyxl') as writer:
             for csv_file in csv_files:
                 try:
-                    # 讀取第一列（網頁名稱、title、網址、輸入網址）
                     with open(csv_file, encoding='utf-8-sig') as f:
                         lines = f.readlines()
                         info_row = [cell.strip() for cell in lines[0].split(',')]
-                    # 讀取資料部分（跳過第一列）
                     df = pd.read_csv(csv_file, skiprows=1)
-                    # 工作表名稱用網頁名稱（長度不能超過 31）
                     sheet_name = str(info_row[1])[:31] if info_row[1] else os.path.basename(csv_file).split('_')[1]
-                    # 寫入 Excel，原始表格（含欄位名稱）
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
                 except Exception as e:
                     print(f"匯入 {csv_file} 到 Excel 時發生錯誤: {e}")
-        # 設定欄寬並插入資訊列
         from openpyxl.utils import get_column_letter
         from openpyxl import load_workbook
         wb = load_workbook(xlsx_name)
         for ws in wb.worksheets:
-            # 插入第一列資訊
             info = None
             for csv_file in csv_files:
                 with open(csv_file, encoding='utf-8-sig') as f:
@@ -183,7 +169,6 @@ def main():
                 ws.insert_rows(1)
                 for i, val in enumerate(info):
                     ws.cell(row=1, column=i+1, value=val)
-            # 設定欄寬
             for col in ws.columns:
                 max_length = 0
                 col_letter = get_column_letter(col[0].column)
