@@ -13,7 +13,10 @@ ENV/
 .vscode/
 
 # Output folders
-output/./*
+output/*
+!output/csv/
+!output/xlsx/
+!output/checked/
 
 # Excel/CSV backup or temp
 *.bak
