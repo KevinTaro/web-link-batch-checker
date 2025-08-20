@@ -13,10 +13,7 @@ ENV/
 .vscode/
 
 # Output folders
-output/*
-output/csv/*
-output/xlsx/*
-output/checked/*
+output/**
 !output/csv/.gitkeep
 !output/xlsx/.gitkeep
 !output/checked/.gitkeep
