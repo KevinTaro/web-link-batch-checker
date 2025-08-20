@@ -14,9 +14,12 @@ ENV/
 
 # Output folders
 output/*
-!output/csv/
-!output/xlsx/
-!output/checked/
+output/csv/*
+output/xlsx/*
+output/checked/*
+!output/csv/.gitkeep
+!output/xlsx/.gitkeep
+!output/checked/.gitkeep
 
 # Excel/CSV backup or temp
 *.bak
