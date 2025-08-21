@@ -41,8 +41,6 @@ class WebLinkCheckerGUI:
         self.btn_all = tk.Button(self.btn_frame, text='一鍵執行完整流程', command=self.run_all)
         self.btn_all.grid(row=0, column=2, padx=5)
 
-        self.btn_cancel = tk.Button(self.btn_frame, text='取消執行', command=self.cancel_task)
-        self.btn_cancel.grid(row=0, column=3, padx=5)
 
         self.btn_show_output = tk.Button(self.btn_frame, text='顯示輸出檔案位置', command=self.show_output_dir)
         self.btn_show_output.grid(row=0, column=4, padx=5)
@@ -54,7 +52,7 @@ class WebLinkCheckerGUI:
         self.result_text = scrolledtext.ScrolledText(root, width=70, height=15)
         self.result_text.pack(pady=(0,10))
 
-        self._cancel_flag = threading.Event()
+    # self._cancel_flag = threading.Event()  # 取消功能已移除
         self.root.after(100, self.process_queue)
 
         self.last_output_file = None
@@ -67,6 +65,7 @@ class WebLinkCheckerGUI:
                 self.result_text.see(tk.END)
             if status:
                 self.status.config(text=status)
+                # 若流程已取消，恢復按鈕
         self.root.after(100, self.process_queue)
 
     def get_latest_file(self, folder):
@@ -77,9 +76,7 @@ class WebLinkCheckerGUI:
                 return files[0]
         return None
 
-    def cancel_task(self):
-        self._cancel_flag.set()
-        self.msg_queue.put(('流程已取消\n', '狀態：已取消'))
+    # 取消功能已移除
 
     def show_output_dir(self):
         import subprocess
@@ -90,7 +87,6 @@ class WebLinkCheckerGUI:
 
     def run_all(self):
         import time
-        self._cancel_flag.clear()
         urls = self.url_text.get('1.0', tk.END).strip().splitlines()
         urls = [u for u in urls if u]
         if not urls:
@@ -104,14 +100,8 @@ class WebLinkCheckerGUI:
         start_time = time.time()
         try:
             self.msg_queue.put(('正在批次抓取...\n', '狀態：正在批次抓取...'))
-            if self._cancel_flag.is_set():
-                self.msg_queue.put(('流程已取消\n', '狀態：已取消'))
-                return
             web_grab_tool.gui_main(urls)
             self.msg_queue.put(('網頁連結已批次抓取並匯出至 output/csv 及 output/xlsx\n', '狀態：抓取完成，準備檢查網址...'))
-            if self._cancel_flag.is_set():
-                self.msg_queue.put(('流程已取消\n', '狀態：已取消'))
-                return
             xlsx_dir = os.path.join('output', 'xlsx')
             xlsx_files = [f for f in os.listdir(xlsx_dir) if f.endswith('.xlsx') and f.startswith('打包網頁連結_')]
             if not xlsx_files:
@@ -120,9 +110,6 @@ class WebLinkCheckerGUI:
             xlsx_files.sort(reverse=True)
             xlsx_file = os.path.join(xlsx_dir, xlsx_files[0])
             self.msg_queue.put(('正在檢查網址...\n', '狀態：正在檢查網址...'))
-            if self._cancel_flag.is_set():
-                self.msg_queue.put(('流程已取消\n', '狀態：已取消'))
-                return
             xlsx_address_check_tool.gui_main(xlsx_file)
             checked_dir = os.path.join('output', 'checked')
             self.last_output_file = self.get_latest_file(checked_dir)
