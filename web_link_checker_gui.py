@@ -80,13 +80,16 @@ class WebLinkCheckerGUI:
             self.result_text.insert(tk.END, '正在檢查網址...\n')
             self.result_text.see(tk.END)
             xlsx_address_check_tool.gui_main(xlsx_file)
-            self.status.config(text='狀態：完整流程完成！')
+            self.status.config(text='狀態：完整流程完成！可再次輸入網址執行下一輪')
             self.result_text.insert(tk.END, f'檢查結果已儲存於 output/checked\n')
             self.result_text.see(tk.END)
+            # 清空輸入框，等待新一輪輸入
+            self.url_text.delete('1.0', tk.END)
         except Exception as e:
-            self.status.config(text='狀態：完整流程失敗')
+            self.status.config(text='狀態：完整流程失敗，可再次輸入網址執行下一輪')
             self.result_text.insert(tk.END, f'錯誤：{e}\n')
             self.result_text.see(tk.END)
+            self.url_text.delete('1.0', tk.END)
 
         self.status = tk.Label(root, text='', fg='blue')
         self.status.pack(pady=5)
