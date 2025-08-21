@@ -22,7 +22,7 @@ class WebLinkCheckerGUI:
         self.root = root
         self.msg_queue = queue.Queue()
         self.root.title('網頁批次抓取與網址檢查工具')
-        self.root.geometry('600x500')
+        self.root.geometry('700x600')
 
         self.url_label = tk.Label(root, text='請在下方輸入網址，每行一個：', fg='gray')
         self.url_label.pack(pady=(10,0))
@@ -57,6 +57,8 @@ class WebLinkCheckerGUI:
         self._cancel_flag = threading.Event()
         self.root.after(100, self.process_queue)
 
+        self.last_output_file = None
+
     def process_queue(self):
         while not self.msg_queue.empty():
             msg, status = self.msg_queue.get()
@@ -67,16 +69,24 @@ class WebLinkCheckerGUI:
                 self.status.config(text=status)
         self.root.after(100, self.process_queue)
 
+    def get_latest_file(self, folder):
+        if os.path.exists(folder):
+            files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.xlsx')]
+            if files:
+                files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+                return files[0]
+        return None
+
     def cancel_task(self):
         self._cancel_flag.set()
         self.msg_queue.put(('流程已取消\n', '狀態：已取消'))
 
     def show_output_dir(self):
         import subprocess
-        output_dir = os.path.abspath('output')
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        subprocess.Popen(f'explorer "{output_dir}"')
+        if self.last_output_file and os.path.exists(self.last_output_file):
+            subprocess.Popen(f'explorer /select,\"{self.last_output_file}\"')
+        else:
+            messagebox.showinfo('提示', '找不到本次產出的檔案！')
 
     def run_all(self):
         import time
@@ -114,6 +124,8 @@ class WebLinkCheckerGUI:
                 self.msg_queue.put(('流程已取消\n', '狀態：已取消'))
                 return
             xlsx_address_check_tool.gui_main(xlsx_file)
+            checked_dir = os.path.join('output', 'checked')
+            self.last_output_file = self.get_latest_file(checked_dir)
             elapsed = time.time() - start_time
             self.msg_queue.put((f'檢查結果已儲存於 output/checked\n', None))
             self.msg_queue.put((f'完整流程完成！總耗時：{elapsed:.1f} 秒\n', f'狀態：完整流程完成！總耗時 {elapsed:.1f} 秒，可再次輸入網址執行下一輪'))
@@ -138,6 +150,8 @@ class WebLinkCheckerGUI:
         try:
             self.msg_queue.put(('正在批次抓取...\n', '狀態：正在批次抓取...'))
             web_grab_tool.gui_main(urls)
+            xlsx_dir = os.path.join('output', 'xlsx')
+            self.last_output_file = self.get_latest_file(xlsx_dir)
             self.msg_queue.put(('網頁連結已批次抓取並匯出至 output/csv 及 output/xlsx\n', '狀態：抓取完成！'))
         except Exception as e:
             self.msg_queue.put((f'錯誤：{e}\n', '狀態：抓取失敗'))
@@ -153,6 +167,8 @@ class WebLinkCheckerGUI:
         try:
             self.msg_queue.put(('正在檢查網址...\n', '狀態：正在檢查網址...'))
             xlsx_address_check_tool.gui_main(xlsx_path)
+            checked_dir = os.path.join('output', 'checked')
+            self.last_output_file = self.get_latest_file(checked_dir)
             self.msg_queue.put((f'檢查結果已儲存於 output/checked\n', '狀態：檢查完成！'))
         except Exception as e:
             self.msg_queue.put((f'錯誤：{e}\n', '狀態：檢查失敗'))
