@@ -4,27 +4,42 @@
 
 ## 專案簡介
 
-本專案可批次抓取多個網頁的所有連結、標題、重要資訊，並自動匯出為 CSV 及 Excel 檔案。後續可自動檢查所有連結是否有效，並將檢查結果回寫到 Excel。
+本專案可批次抓取多個網頁的所有連結、標題、重要資訊，並自動匯出為 CSV 及 Excel 檔案。
+後續可自動檢查所有連結是否有效，並將檢查結果回寫到 Excel。
+支援 CLI 與 GUI 介面，流程可重複執行，並即時顯示進度與結果。
 
 ## 特色與技術優化
 
 -   全面採用 Python async/await 非同步技術，所有網頁抓取與網址檢查皆同時並行，效能大幅提升。
 -   慢速網站自動延長 timeout 並多次重試，最大化檢查準確率。
 -   支援大量網址高效處理，充分發揮現代電腦 I/O 與多核心效能。
+-   GUI 支援一鍵完整流程、即時訊息、取消執行、顯示最新產出檔案位置。
+-   所有訊息 thread-safe，進度與狀態即時更新。
 
 ## 主要程式
 
--   `網頁抓取工具.py`：輸入多個網址，非同步批次抓取網頁連結，匯出 CSV 與合併 Excel。
--   `xlsx網址檢查工具.py`：非同步批次檢查 Excel 檔案中的所有網址，回寫檢查結果。
+-   `web_grab_tool.py`：輸入多個網址，非同步批次抓取網頁連結，匯出 CSV 與合併 Excel。
+-   `xlsx_address_check_tool.py`：非同步批次檢查 Excel 檔案中的所有網址，回寫檢查結果。
+-   `web_link_checker_gui.py`：Tkinter GUI，支援一鍵完整流程、重複執行、即時訊息、取消、顯示最新產出檔案。
 
 ## 使用方式
 
-1. 執行 `xlsx網址檢查工具.py`，依指示輸入網址（或直接執行，會自動串聯抓取與檢查流程）。
-2. 所有結果會自動分類存放於 `output` 資料夾：
+### CLI 執行
 
--   `csv/`：每個網頁的原始連結資料 CSV
--   `xlsx/`：合併後的 Excel 檔案
--   `checked/`：檢查結果 Excel 檔案
+1. 執行 `xlsx_address_check_tool.py` 或 `web_grab_tool.py`，依指示輸入網址（或選擇要檢查的 Excel 檔案）。
+2. 所有結果會自動分類存放於 `output` 資料夾：
+    - `csv/`：每個網頁的原始連結資料 CSV
+    - `xlsx/`：合併後的 Excel 檔案
+    - `checked/`：檢查結果 Excel 檔案
+
+### GUI 執行
+
+1. 執行 `web_link_checker_gui.py`，可用視窗操作：
+    - 輸入網址 → 批次抓取
+    - 選擇 Excel 檔案 → 批次檢查
+    - 一鍵執行完整流程（抓取+檢查）
+    - 取消執行、顯示最新產出檔案位置
+2. 所有進度與結果即時顯示於視窗。
 
 ## 安裝需求
 
@@ -44,8 +59,8 @@ pip install pandas aiohttp openpyxl beautifulsoup4 requests
 
 ## 執行方式
 
-1. 執行 `xlsx網址檢查工具.py`，可自動呼叫 `網頁抓取工具.py` 並完成所有批次作業。
-2. 依照指示輸入網址或選擇要檢查的 Excel 檔案。
+-   CLI：直接執行 `xlsx_address_check_tool.py` 或 `web_grab_tool.py`，依指示操作。
+-   GUI：執行 `web_link_checker_gui.py`，依視窗操作流程。
 
 ## 注意事項
 
