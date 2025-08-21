@@ -20,9 +20,11 @@ class WebLinkCheckerGUI:
         self.root.title('網頁批次抓取與網址檢查工具')
         self.root.geometry('600x500')
 
+
+        self.url_label = tk.Label(root, text='請在下方輸入網址，每行一個：', fg='gray')
+        self.url_label.pack(pady=(10,0))
         self.url_text = scrolledtext.ScrolledText(root, width=70, height=10)
-        self.url_text.pack(pady=10)
-        self.url_text.insert(tk.END, '請在此輸入網址，每行一個...')
+        self.url_text.pack(pady=(0,10))
 
         self.btn_frame = tk.Frame(root)
         self.btn_frame.pack(pady=5)
@@ -35,42 +37,56 @@ class WebLinkCheckerGUI:
 
         self.btn_all = tk.Button(self.btn_frame, text='一鍵執行完整流程', command=self.run_all)
         self.btn_all.grid(row=0, column=2, padx=5)
-        self.status = tk.Label(root, text='', fg='blue')
+        self.status = tk.Label(root, text='狀態：等待操作', fg='blue')
         self.status.pack(pady=5)
 
+        self.result_label = tk.Label(root, text='執行結果與進度：', fg='gray')
+        self.result_label.pack(pady=(10,0))
         self.result_text = scrolledtext.ScrolledText(root, width=70, height=15)
-        self.result_text.pack(pady=10)
+        self.result_text.pack(pady=(0,10))
 
     def run_all(self):
         urls = self.url_text.get('1.0', tk.END).strip().splitlines()
-        urls = [u for u in urls if u and not u.startswith('請在此輸入')]
+        urls = [u for u in urls if u]
         if not urls:
             messagebox.showwarning('警告', '請輸入至少一個網址！')
             return
-        self.status.config(text='正在執行完整流程...')
+        self.status.config(text='狀態：正在執行完整流程...')
+        self.result_text.insert(tk.END, '開始執行完整流程...\n')
+        self.result_text.see(tk.END)
         threading.Thread(target=self.all_worker, args=(urls,), daemon=True).start()
 
     def all_worker(self, urls):
         try:
             # 1. 抓取
-            self.status.config(text='正在批次抓取...')
+            self.status.config(text='狀態：正在批次抓取...')
+            self.result_text.insert(tk.END, '正在批次抓取...\n')
+            self.result_text.see(tk.END)
             web_grab_tool.gui_main(urls)
+            self.status.config(text='狀態：抓取完成，準備檢查網址...')
             self.result_text.insert(tk.END, '網頁連結已批次抓取並匯出至 output/csv 及 output/xlsx\n')
+            self.result_text.see(tk.END)
             # 2. 自動選擇最新 xlsx 檔案
             xlsx_dir = os.path.join('output', 'xlsx')
             xlsx_files = [f for f in os.listdir(xlsx_dir) if f.endswith('.xlsx') and f.startswith('打包網頁連結_')]
             if not xlsx_files:
-                self.status.config(text='找不到要檢查的 xlsx 檔案')
+                self.status.config(text='狀態：找不到要檢查的 xlsx 檔案')
+                self.result_text.insert(tk.END, '找不到要檢查的 xlsx 檔案\n')
+                self.result_text.see(tk.END)
                 return
             xlsx_files.sort(reverse=True)
             xlsx_file = os.path.join(xlsx_dir, xlsx_files[0])
-            self.status.config(text='正在檢查網址...')
+            self.status.config(text='狀態：正在檢查網址...')
+            self.result_text.insert(tk.END, '正在檢查網址...\n')
+            self.result_text.see(tk.END)
             xlsx_address_check_tool.gui_main(xlsx_file)
-            self.status.config(text='完整流程完成！')
+            self.status.config(text='狀態：完整流程完成！')
             self.result_text.insert(tk.END, f'檢查結果已儲存於 output/checked\n')
+            self.result_text.see(tk.END)
         except Exception as e:
-            self.status.config(text='完整流程失敗')
+            self.status.config(text='狀態：完整流程失敗')
             self.result_text.insert(tk.END, f'錯誤：{e}\n')
+            self.result_text.see(tk.END)
 
         self.status = tk.Label(root, text='', fg='blue')
         self.status.pack(pady=5)
@@ -80,39 +96,51 @@ class WebLinkCheckerGUI:
 
     def start_grab(self):
         urls = self.url_text.get('1.0', tk.END).strip().splitlines()
-        urls = [u for u in urls if u and not u.startswith('請在此輸入')]
+        urls = [u for u in urls if u]
         if not urls:
             messagebox.showwarning('警告', '請輸入至少一個網址！')
             return
-        self.status.config(text='正在批次抓取...')
+        self.status.config(text='狀態：正在批次抓取...')
+        self.result_text.insert(tk.END, '正在批次抓取...\n')
+        self.result_text.see(tk.END)
         threading.Thread(target=self.grab_worker, args=(urls,), daemon=True).start()
 
     def grab_worker(self, urls):
         try:
-            # 執行 async GUI 入口
+            self.status.config(text='狀態：正在批次抓取...')
+            self.result_text.insert(tk.END, '正在批次抓取...\n')
+            self.result_text.see(tk.END)
             web_grab_tool.gui_main(urls)
-            self.status.config(text='抓取完成！')
+            self.status.config(text='狀態：抓取完成！')
             self.result_text.insert(tk.END, '網頁連結已批次抓取並匯出至 output/csv 及 output/xlsx\n')
+            self.result_text.see(tk.END)
         except Exception as e:
-            self.status.config(text='抓取失敗')
+            self.status.config(text='狀態：抓取失敗')
             self.result_text.insert(tk.END, f'錯誤：{e}\n')
+            self.result_text.see(tk.END)
 
     def select_xlsx(self):
         xlsx_path = filedialog.askopenfilename(title='選擇要檢查的 Excel 檔案', filetypes=[('Excel Files', '*.xlsx')])
         if not xlsx_path:
             return
-        self.status.config(text='正在檢查網址...')
+        self.status.config(text='狀態：正在檢查網址...')
+        self.result_text.insert(tk.END, '正在檢查網址...\n')
+        self.result_text.see(tk.END)
         threading.Thread(target=self.check_worker, args=(xlsx_path,), daemon=True).start()
 
     def check_worker(self, xlsx_path):
         try:
-            # 執行 async GUI 入口
+            self.status.config(text='狀態：正在檢查網址...')
+            self.result_text.insert(tk.END, '正在檢查網址...\n')
+            self.result_text.see(tk.END)
             xlsx_address_check_tool.gui_main(xlsx_path)
-            self.status.config(text='檢查完成！')
+            self.status.config(text='狀態：檢查完成！')
             self.result_text.insert(tk.END, f'檢查結果已儲存於 output/checked\n')
+            self.result_text.see(tk.END)
         except Exception as e:
-            self.status.config(text='檢查失敗')
+            self.status.config(text='狀態：檢查失敗')
             self.result_text.insert(tk.END, f'錯誤：{e}\n')
+            self.result_text.see(tk.END)
 
 if __name__ == '__main__':
     root = tk.Tk()
