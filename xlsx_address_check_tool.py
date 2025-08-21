@@ -1,3 +1,35 @@
+def cli_all():
+    while True:
+        print('=== 一鍵執行完整流程 (CLI) ===')
+        print('請輸入要批次抓取的網址，每行一個，輸入 quit 結束輸入：')
+        urls = []
+        while True:
+            url = input().strip()
+            if url.lower() == 'quit':
+                break
+            if url:
+                if not url.startswith(('http://', 'https://')):
+                    url = 'https://' + url
+                urls.append(url)
+        if not urls:
+            print('未輸入任何網址，流程結束。')
+            break
+        import web_grab_tool
+        print('正在批次抓取...')
+        web_grab_tool.gui_main(urls)
+        print('網頁連結已批次抓取並匯出至 output/csv 及 output/xlsx')
+        # 自動選擇最新 xlsx 檔案
+        xlsx_dir = os.path.join('output', 'xlsx')
+        xlsx_files = [f for f in os.listdir(xlsx_dir) if f.endswith('.xlsx') and f.startswith('打包網頁連結_')]
+        if not xlsx_files:
+            print('找不到要檢查的 xlsx 檔案')
+            continue
+        xlsx_files.sort(reverse=True)
+        xlsx_file = os.path.join(xlsx_dir, xlsx_files[0])
+        print('正在檢查網址...')
+        gui_main(xlsx_file)
+        print('檢查結果已儲存於 output/checked')
+        print('--- 流程結束，可繼續輸入網址或輸入 quit 離開 ---')
 import pandas as pd
 import aiohttp
 import asyncio
@@ -39,10 +71,14 @@ async def batch_check_urls(urls, timeout=5, retries=2):
     return results
 
 
-def main():
+
+def cli_main():
     xlsx_file = input('請輸入要檢查的 xlsx 檔案名稱：').strip()
     if not os.path.isabs(xlsx_file):
         xlsx_file = os.path.join('output', 'xlsx', xlsx_file)
+    gui_main(xlsx_file)
+
+def gui_main(xlsx_file):
     wb = load_workbook(xlsx_file)
     for ws in wb.worksheets:
         print(f'正在檢查工作表：{ws.title}')
@@ -64,7 +100,6 @@ def main():
             if url:
                 urls.append(url)
                 row_url_map[row] = url
-        # async 批次檢查
         results = asyncio.run(batch_check_urls(urls, timeout=5, retries=3))
         for row, url in row_url_map.items():
             ws.cell(row=row, column=result_col, value=results.get(url, ''))
@@ -114,4 +149,11 @@ def run_project():
     print(f'已完成檢查，結果儲存為 {out_path}')
 
 if __name__ == '__main__':
-    run_project()
+    print('請選擇執行模式：')
+    print('1. 只檢查 Excel 網址 (原CLI)')
+    print('2. 一鍵執行完整流程 (抓取+檢查)')
+    mode = input('請輸入 1 或 2：').strip()
+    if mode == '2':
+        cli_all()
+    else:
+        cli_main()

@@ -103,23 +103,12 @@ def save_to_csv(data, filename):
         return False
 
 
-async def main():
-    print("=== 網頁連結抓取工具 ===")
-    print("此工具可以抓取網頁上的所有連結和標題，並儲存為 CSV 檔案")
-    print()
 
+async def batch_grab(urls):
+    """
+    非同步批次抓取，urls 為網址 list
+    """
     csv_files = []
-    print("請輸入要抓取的多個網頁網址，每行一個，輸入 'quit' 結束輸入：")
-    urls = []
-    while True:
-        url = input().strip()
-        if url.lower() == 'quit':
-            break
-        if url:
-            if not url.startswith(('http://', 'https://')):
-                url = 'https://' + url
-            urls.append(url)
-
     connector = aiohttp.TCPConnector(limit=32, ssl=False)
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [get_webpage_links(session, url, timeout=10, retries=3) for url in urls]
@@ -136,7 +125,6 @@ async def main():
                 print("可以用 Excel 開啟此檔案")
                 csv_files.append(filename)
             print("-" * 50)
-
     if csv_files:
         xlsx_name = os.path.join('output', 'xlsx', f"打包網頁連結_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
         from openpyxl.utils import get_column_letter
@@ -181,5 +169,27 @@ async def main():
         wb.save(xlsx_name)
     print(f"所有網頁已打包成 Excel 檔案：{xlsx_name}")
 
+def cli_main():
+    print("=== 網頁連結抓取工具 (CLI) ===")
+    print("此工具可以抓取網頁上的所有連結和標題，並儲存為 CSV 檔案")
+    print()
+    print("請輸入要抓取的多個網頁網址，每行一個，輸入 'quit' 結束輸入：")
+    urls = []
+    while True:
+        url = input().strip()
+        if url.lower() == 'quit':
+            break
+        if url:
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+            urls.append(url)
+    asyncio.run(batch_grab(urls))
+
+def gui_main(urls):
+    """
+    給 GUI 用，urls 為網址 list
+    """
+    asyncio.run(batch_grab(urls))
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    cli_main()
