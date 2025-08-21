@@ -63,7 +63,7 @@ pip install pandas aiohttp openpyxl beautifulsoup4 requests
 
 ## 聯絡方式
 
-如需協助或有其他問題，請於 Issues 留言或 email 至 kevin.taro@example.com。
+如需協助或有其他問題，請於 Issues 留言。
 
 ## 授權條款
 
