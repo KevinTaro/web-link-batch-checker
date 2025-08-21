@@ -75,9 +75,9 @@ def main():
 
 def run_project():
     print("=== 網頁批次抓取與網址檢查專案 ===")
-    import 網頁抓取工具
+    import web_grab_tool
     import asyncio
-    asyncio.run(網頁抓取工具.main())
+    asyncio.run(web_grab_tool.main())
     xlsx_files = [f for f in os.listdir(os.path.join('output', 'xlsx')) if f.endswith('.xlsx') and f.startswith('打包網頁連結_')]
     if not xlsx_files:
         print('找不到要檢查的 xlsx 檔案')
