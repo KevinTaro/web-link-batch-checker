@@ -1,28 +1,43 @@
 import pandas as pd
-import requests
+import aiohttp
+import asyncio
 from openpyxl import load_workbook
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-def check_url(url, timeout=5):
-    try:
-        resp = requests.get(url, timeout=timeout)
-        return 'OK' if resp.status_code == 200 else f'HTTP {resp.status_code}'
-    except requests.exceptions.RequestException as e:
-        return str(e)
 
-def batch_check_urls(urls, max_workers=16, timeout=5):
+async def check_url(session, url, timeout=5, retries=2):
+    for attempt in range(retries):
+        try:
+            async with session.get(url, timeout=timeout) as resp:
+                if resp.status == 200:
+                    return 'OK'
+                else:
+                    return f'HTTP {resp.status}'
+        except asyncio.TimeoutError:
+            if attempt < retries - 1:
+                timeout *= 2  # 慢網站自動延長 timeout
+                continue
+            return 'Timeout'
+        except aiohttp.ClientError as e:
+            if attempt < retries - 1:
+                await asyncio.sleep(1)
+                continue
+            return str(e)
+        except Exception as e:
+            return str(e)
+
+
+async def batch_check_urls(urls, timeout=5, retries=2):
     results = {}
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_url = {executor.submit(check_url, url, timeout): url for url in urls}
-        for future in as_completed(future_to_url):
-            url = future_to_url[future]
-            try:
-                results[url] = future.result()
-            except Exception as exc:
-                results[url] = str(exc)
+    connector = aiohttp.TCPConnector(limit=64, ssl=False)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks = [check_url(session, url, timeout=timeout, retries=retries) for url in urls]
+        responses = await asyncio.gather(*tasks)
+        for url, result in zip(urls, responses):
+            results[url] = result
     return results
+
 
 def main():
     xlsx_file = input('請輸入要檢查的 xlsx 檔案名稱：').strip()
@@ -31,7 +46,6 @@ def main():
     wb = load_workbook(xlsx_file)
     for ws in wb.worksheets:
         print(f'正在檢查工作表：{ws.title}')
-        # 找到網址欄位
         header_row = 2 if ws.cell(row=2, column=1).value == '標題' else 1
         url_col = None
         for col in range(1, ws.max_column+1):
@@ -41,10 +55,8 @@ def main():
         if not url_col:
             print(f'找不到「網址」欄位，略過工作表 {ws.title}')
             continue
-        # 新增結果欄位
         result_col = ws.max_column + 1
         ws.cell(row=header_row, column=result_col, value='網址檢查結果')
-        # 批次收集所有網址
         urls = []
         row_url_map = {}
         for row in range(header_row+1, ws.max_row+1):
@@ -52,21 +64,20 @@ def main():
             if url:
                 urls.append(url)
                 row_url_map[row] = url
-        # 批次檢查
-        results = batch_check_urls(urls)
+        # async 批次檢查
+        results = asyncio.run(batch_check_urls(urls, timeout=5, retries=3))
         for row, url in row_url_map.items():
             ws.cell(row=row, column=result_col, value=results.get(url, ''))
     out_path = os.path.join('output', 'checked', f'檢查結果_{os.path.basename(xlsx_file)}')
     wb.save(out_path)
     print(f'已完成檢查，結果儲存為 {out_path}')
 
+
 def run_project():
     print("=== 網頁批次抓取與網址檢查專案 ===")
-    # 1. 執行網頁抓取
     import 網頁抓取工具
-    網頁抓取工具.main()
-    # 2. 執行網址檢查
-    # 自動尋找 output 資料夾最新 xlsx
+    import asyncio
+    asyncio.run(網頁抓取工具.main())
     xlsx_files = [f for f in os.listdir(os.path.join('output', 'xlsx')) if f.endswith('.xlsx') and f.startswith('打包網頁連結_')]
     if not xlsx_files:
         print('找不到要檢查的 xlsx 檔案')
@@ -95,7 +106,7 @@ def run_project():
             if url:
                 urls.append(url)
                 row_url_map[row] = url
-        results = batch_check_urls(urls)
+        results = asyncio.run(batch_check_urls(urls, timeout=5, retries=3))
         for row, url in row_url_map.items():
             ws.cell(row=row, column=result_col, value=results.get(url, ''))
     out_path = os.path.join('output', 'checked', f'檢查結果_{xlsx_file}')

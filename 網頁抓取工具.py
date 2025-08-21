@@ -1,4 +1,5 @@
-import requests
+import aiohttp
+import asyncio
 from bs4 import BeautifulSoup
 import csv
 import urllib.parse
@@ -6,42 +7,48 @@ from datetime import datetime
 import os
 import glob
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def get_webpage_links(url):
-    """
-    抓取網頁上的所有標題和連結
-    """
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        h2_titles = [h2.get_text(strip=True) for h2 in soup.find_all('h2', class_='Index_title')]
-        links = soup.find_all('a')
-        data = []
-        for link in links:
-            a_text = link.get_text(strip=True)
-            href = link.get('href')
-            a_title = link.get('title') if link.has_attr('title') else ''
-            target_blank = '是' if link.get('target') == '_blank' else ''
-            if href and not href.strip().lower().startswith('javascript:'):
-                absolute_url = urllib.parse.urljoin(url, href)
-                if not a_text:
-                    a_text = href
-                index_title = h2_titles[0] if h2_titles else ''
-                data.append([a_text, absolute_url, a_title, target_blank, index_title])
-        for h2_title in h2_titles:
-            data.append([h2_title, '', '', '', h2_title])
-        return data
-    except requests.exceptions.RequestException as e:
-        print(f"網頁請求錯誤: {e}")
-        return []
-    except Exception as e:
-        print(f"處理過程發生錯誤: {e}")
-        return []
+
+async def get_webpage_links(session, url, timeout=10, retries=2):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    for attempt in range(retries):
+        try:
+            async with session.get(url, headers=headers, timeout=timeout) as response:
+                if response.status != 200:
+                    return []
+                text = await response.text()
+                soup = BeautifulSoup(text, 'html.parser')
+                h2_titles = [h2.get_text(strip=True) for h2 in soup.find_all('h2', class_='Index_title')]
+                links = soup.find_all('a')
+                data = []
+                for link in links:
+                    a_text = link.get_text(strip=True)
+                    href = link.get('href')
+                    a_title = link.get('title') if link.has_attr('title') else ''
+                    target_blank = '是' if link.get('target') == '_blank' else ''
+                    if href and not href.strip().lower().startswith('javascript:'):
+                        absolute_url = urllib.parse.urljoin(url, href)
+                        if not a_text:
+                            a_text = href
+                        index_title = h2_titles[0] if h2_titles else ''
+                        data.append([a_text, absolute_url, a_title, target_blank, index_title])
+                for h2_title in h2_titles:
+                    data.append([h2_title, '', '', '', h2_title])
+                return data
+        except asyncio.TimeoutError:
+            if attempt < retries - 1:
+                timeout *= 2
+                continue
+            return []
+        except aiohttp.ClientError:
+            if attempt < retries - 1:
+                await asyncio.sleep(1)
+                continue
+            return []
+        except Exception:
+            return []
 
 def save_to_csv(data, filename):
     """
@@ -95,10 +102,8 @@ def save_to_csv(data, filename):
         print(f"儲存檔案時發生錯誤: {e}")
         return False
 
-def main():
-    """
-    主程式
-    """
+
+async def main():
     print("=== 網頁連結抓取工具 ===")
     print("此工具可以抓取網頁上的所有連結和標題，並儲存為 CSV 檔案")
     print()
@@ -111,20 +116,15 @@ def main():
         if url.lower() == 'quit':
             break
         if url:
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
             urls.append(url)
 
-    # 多執行緒批次抓取所有網址
-    def fetch_one(url):
-        if not url.startswith(('http://', 'https://')):
-            url = 'https://' + url
-        data = get_webpage_links(url)
-        return url, data
-
-    results = {}
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        future_to_url = {executor.submit(fetch_one, url): url for url in urls}
-        for future in as_completed(future_to_url):
-            url, data = future.result()
+    connector = aiohttp.TCPConnector(limit=32, ssl=False)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks = [get_webpage_links(session, url, timeout=10, retries=3) for url in urls]
+        results = await asyncio.gather(*tasks)
+        for url, data in zip(urls, results):
             if not data:
                 print(f"{url} 沒有找到任何連結，或抓取失敗")
                 continue
@@ -137,7 +137,6 @@ def main():
                 csv_files.append(filename)
             print("-" * 50)
 
-    # 結束時打包成 xlsx
     if csv_files:
         xlsx_name = os.path.join('output', 'xlsx', f"打包網頁連結_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
         from openpyxl.utils import get_column_letter
@@ -183,4 +182,4 @@ def main():
     print(f"所有網頁已打包成 Excel 檔案：{xlsx_name}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
