@@ -85,3 +85,16 @@ pip install pandas aiohttp openpyxl beautifulsoup4 requests
 本專案採用 MIT License 授權。詳見 [LICENSE](LICENSE) 檔案。
 
 > 本專案公開於 GitHub Public Repository，請勿上傳敏感或私人資料。
+
+## 最新優化與穩定性說明
+
+-   網路請求（抓取/檢查）全面採用高彈性重試機制，timeout 會自動延長至 120 秒，重試次數最多 5 次。
+-   特殊處理 [WinError 64] 指定的網路名稱無法使用，遇到此錯誤會自動重試並記錄。
+-   降低同時執行的網址數（最大 8），大幅減少端口負載與 timeout 誤判率，提升穩定性。
+-   所有異常皆有詳細 log 記錄，方便追蹤與除錯。
+-   速度略降但穩定性顯著提升，適合大量網址或不穩定網路環境。
+
+## 參數建議
+
+-   若遇大量 timeout，可適度調高重試次數或延長 timeout，並減少同時執行數（limit）。
+-   相關參數可於 `web_grab_tool.py` 及 `xlsx_address_check_tool.py` 內調整。
