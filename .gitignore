@@ -3,25 +3,14 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.env
-.env
-.venv/
-venv/
-ENV/
 
 # VSCode
 .vscode/
 
-# Output folders
-output/**
-!output/csv/.gitkeep
-!output/xlsx/.gitkeep
-!output/checked/.gitkeep
+# PyInstaller
+/dist/
+/build/
+*.spec
 
-# Excel/CSV backup or temp
-*.bak
-*.tmp
-
-# OS
-.DS_Store
-Thumbs.db
+# Output 資料
+/output/
