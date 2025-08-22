@@ -1,16 +1,39 @@
-# Python
+# Python 暫存
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# VSCode
-.vscode/
+# 虛擬環境
+.venv/
+venv/
 
-# PyInstaller
+# VSCode 設定
+.vscode/
+.vscode/*
+
+# PyInstaller 產物
 /dist/
 /build/
 *.spec
 
-# Output 資料
-/output/
+# Output 資料夾（保留子資料夾結構，排除所有檔案）
+/output/*
+!/output/checked/
+!/output/csv/
+!/output/xlsx/
+/output/checked/*
+/output/csv/*
+/output/xlsx/*
+
+# 其他 IDE/編譯器暫存
+*.db
+*.db-shm
+*.db-wal
+
+# Git ignore 自身
+.gitignore
+
+# 其他
+.DS_Store
+Thumbs.db
