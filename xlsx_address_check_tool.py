@@ -1,3 +1,35 @@
+def process_xlsx_check(xlsx_file, checked_dir='output/checked'):
+    """
+    檢查 Excel 檔案中的網址，並將結果儲存到 checked_dir
+    """
+    wb = load_workbook(xlsx_file)
+    for ws in wb.worksheets:
+        print(f'正在檢查工作表：{ws.title}')
+        header_row = 2 if ws.cell(row=2, column=1).value == '標題' else 1
+        url_col = None
+        for col in range(1, ws.max_column+1):
+            if ws.cell(row=header_row, column=col).value == '網址':
+                url_col = col
+                break
+        if not url_col:
+            print(f'找不到「網址」欄位，略過工作表 {ws.title}')
+            continue
+        result_col = ws.max_column + 1
+        ws.cell(row=header_row, column=result_col, value='網址檢查結果')
+        urls = []
+        row_url_map = {}
+        for row in range(header_row+1, ws.max_row+1):
+            url = ws.cell(row=row, column=url_col).value
+            if url:
+                urls.append(url)
+                row_url_map[row] = url
+        results = asyncio.run(batch_check_urls(urls, timeout=5, retries=3))
+        for row, url in row_url_map.items():
+            ws.cell(row=row, column=result_col, value=results.get(url, ''))
+    out_path = os.path.join(checked_dir, f'檢查結果_{os.path.basename(xlsx_file)}')
+    wb.save(out_path)
+    print(f'已完成檢查，結果儲存為 {out_path}')
+
 def cli_all():
     while True:
         print('=== 一鍵執行完整流程 (CLI) ===')
@@ -27,7 +59,7 @@ def cli_all():
         xlsx_files.sort(reverse=True)
         xlsx_file = os.path.join(xlsx_dir, xlsx_files[0])
         print('正在檢查網址...')
-        gui_main(xlsx_file)
+        process_xlsx_check(xlsx_file)
         print('檢查結果已儲存於 output/checked')
         print('--- 流程結束，可繼續輸入網址或輸入 quit 離開 ---')
 import pandas as pd
@@ -76,36 +108,10 @@ def cli_main():
     xlsx_file = input('請輸入要檢查的 xlsx 檔案名稱：').strip()
     if not os.path.isabs(xlsx_file):
         xlsx_file = os.path.join('output', 'xlsx', xlsx_file)
-    gui_main(xlsx_file)
+    process_xlsx_check(xlsx_file)
 
 def gui_main(xlsx_file):
-    wb = load_workbook(xlsx_file)
-    for ws in wb.worksheets:
-        print(f'正在檢查工作表：{ws.title}')
-        header_row = 2 if ws.cell(row=2, column=1).value == '標題' else 1
-        url_col = None
-        for col in range(1, ws.max_column+1):
-            if ws.cell(row=header_row, column=col).value == '網址':
-                url_col = col
-                break
-        if not url_col:
-            print(f'找不到「網址」欄位，略過工作表 {ws.title}')
-            continue
-        result_col = ws.max_column + 1
-        ws.cell(row=header_row, column=result_col, value='網址檢查結果')
-        urls = []
-        row_url_map = {}
-        for row in range(header_row+1, ws.max_row+1):
-            url = ws.cell(row=row, column=url_col).value
-            if url:
-                urls.append(url)
-                row_url_map[row] = url
-        results = asyncio.run(batch_check_urls(urls, timeout=5, retries=3))
-        for row, url in row_url_map.items():
-            ws.cell(row=row, column=result_col, value=results.get(url, ''))
-    out_path = os.path.join('output', 'checked', f'檢查結果_{os.path.basename(xlsx_file)}')
-    wb.save(out_path)
-    print(f'已完成檢查，結果儲存為 {out_path}')
+    process_xlsx_check(xlsx_file)
 
 
 def run_project():
@@ -118,35 +124,9 @@ def run_project():
         print('找不到要檢查的 xlsx 檔案')
         return
     xlsx_files.sort(reverse=True)
-    xlsx_file = xlsx_files[0]
+    xlsx_file = os.path.join('output', 'xlsx', xlsx_files[0])
     print(f'自動選擇最新檔案：{xlsx_file}')
-    wb = load_workbook(os.path.join('output', 'xlsx', xlsx_file))
-    for ws in wb.worksheets:
-        print(f'正在檢查工作表：{ws.title}')
-        header_row = 2 if ws.cell(row=2, column=1).value == '標題' else 1
-        url_col = None
-        for col in range(1, ws.max_column+1):
-            if ws.cell(row=header_row, column=col).value == '網址':
-                url_col = col
-                break
-        if not url_col:
-            print(f'找不到「網址」欄位，略過工作表 {ws.title}')
-            continue
-        result_col = ws.max_column + 1
-        ws.cell(row=header_row, column=result_col, value='網址檢查結果')
-        urls = []
-        row_url_map = {}
-        for row in range(header_row+1, ws.max_row+1):
-            url = ws.cell(row=row, column=url_col).value
-            if url:
-                urls.append(url)
-                row_url_map[row] = url
-        results = asyncio.run(batch_check_urls(urls, timeout=5, retries=3))
-        for row, url in row_url_map.items():
-            ws.cell(row=row, column=result_col, value=results.get(url, ''))
-    out_path = os.path.join('output', 'checked', f'檢查結果_{xlsx_file}')
-    wb.save(out_path)
-    print(f'已完成檢查，結果儲存為 {out_path}')
+    process_xlsx_check(xlsx_file)
 
 if __name__ == '__main__':
     print('請選擇執行模式：')

@@ -96,6 +96,9 @@ class WebLinkCheckerGUI:
         threading.Thread(target=self.all_worker, args=(urls,), daemon=True).start()
 
     def all_worker(self, urls):
+        self._run_full_process(urls)
+
+    def _run_full_process(self, urls):
         import time
         start_time = time.time()
         try:
@@ -134,6 +137,9 @@ class WebLinkCheckerGUI:
         threading.Thread(target=self.grab_worker, args=(urls,), daemon=True).start()
 
     def grab_worker(self, urls):
+        self._run_grab_only(urls)
+
+    def _run_grab_only(self, urls):
         try:
             self.msg_queue.put(('正在批次抓取...\n', '狀態：正在批次抓取...'))
             web_grab_tool.gui_main(urls)
@@ -151,6 +157,9 @@ class WebLinkCheckerGUI:
         threading.Thread(target=self.check_worker, args=(xlsx_path,), daemon=True).start()
 
     def check_worker(self, xlsx_path):
+        self._run_check_only(xlsx_path)
+
+    def _run_check_only(self, xlsx_path):
         try:
             self.msg_queue.put(('正在檢查網址...\n', '狀態：正在檢查網址...'))
             xlsx_address_check_tool.gui_main(xlsx_path)

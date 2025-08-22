@@ -104,6 +104,49 @@ def save_to_csv(data, filename):
 
 
 
+def process_excel_pack(csv_files, xlsx_name):
+    """
+    將多個 csv 檔案打包成一個 Excel，並自動調整欄寬
+    """
+    from openpyxl.utils import get_column_letter
+    from openpyxl import load_workbook
+    with pd.ExcelWriter(xlsx_name, engine='openpyxl') as writer:
+        for csv_file in csv_files:
+            try:
+                with open(csv_file, encoding='utf-8-sig') as f:
+                    lines = f.readlines()
+                    info_row = [cell.strip() for cell in lines[0].split(',')]
+                df = pd.read_csv(csv_file, skiprows=1)
+                sheet_name = str(info_row[1])[:31] if info_row[1] else os.path.basename(csv_file).split('_')[1]
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+            except Exception as e:
+                print(f"匯入 {csv_file} 到 Excel 時發生錯誤: {e}")
+    wb = load_workbook(xlsx_name)
+    for ws in wb.worksheets:
+        info = None
+        for csv_file in csv_files:
+            with open(csv_file, encoding='utf-8-sig') as f:
+                info_row = [cell.strip() for cell in f.readline().split(',')]
+            sheet_name = str(info_row[1])[:31] if info_row[1] else os.path.basename(csv_file).split('_')[1]
+            if ws.title == sheet_name:
+                info = info_row
+                break
+        if info:
+            ws.insert_rows(1)
+            for i, val in enumerate(info):
+                ws.cell(row=1, column=i+1, value=val)
+        for col in ws.columns:
+            max_length = 0
+            col_letter = get_column_letter(col[0].column)
+            for cell in col:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            ws.column_dimensions[col_letter].width = min(max_length + 2, 50)
+    wb.save(xlsx_name)
+
 async def batch_grab(urls):
     """
     非同步批次抓取，urls 為網址 list
@@ -127,47 +170,8 @@ async def batch_grab(urls):
             print("-" * 50)
     if csv_files:
         xlsx_name = os.path.join('output', 'xlsx', f"打包網頁連結_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
-        from openpyxl.utils import get_column_letter
-        from openpyxl import load_workbook
-        with pd.ExcelWriter(xlsx_name, engine='openpyxl') as writer:
-            for csv_file in csv_files:
-                try:
-                    with open(csv_file, encoding='utf-8-sig') as f:
-                        lines = f.readlines()
-                        info_row = [cell.strip() for cell in lines[0].split(',')]
-                    df = pd.read_csv(csv_file, skiprows=1)
-                    sheet_name = str(info_row[1])[:31] if info_row[1] else os.path.basename(csv_file).split('_')[1]
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-                except Exception as e:
-                    print(f"匯入 {csv_file} 到 Excel 時發生錯誤: {e}")
-        from openpyxl.utils import get_column_letter
-        from openpyxl import load_workbook
-        wb = load_workbook(xlsx_name)
-        for ws in wb.worksheets:
-            info = None
-            for csv_file in csv_files:
-                with open(csv_file, encoding='utf-8-sig') as f:
-                    info_row = [cell.strip() for cell in f.readline().split(',')]
-                sheet_name = str(info_row[1])[:31] if info_row[1] else os.path.basename(csv_file).split('_')[1]
-                if ws.title == sheet_name:
-                    info = info_row
-                    break
-            if info:
-                ws.insert_rows(1)
-                for i, val in enumerate(info):
-                    ws.cell(row=1, column=i+1, value=val)
-            for col in ws.columns:
-                max_length = 0
-                col_letter = get_column_letter(col[0].column)
-                for cell in col:
-                    try:
-                        if cell.value:
-                            max_length = max(max_length, len(str(cell.value)))
-                    except:
-                        pass
-                ws.column_dimensions[col_letter].width = min(max_length + 2, 50)
-        wb.save(xlsx_name)
-    print(f"所有網頁已打包成 Excel 檔案：{xlsx_name}")
+        process_excel_pack(csv_files, xlsx_name)
+        print(f"所有網頁已打包成 Excel 檔案：{xlsx_name}")
 
 def cli_main():
     print("=== 網頁連結抓取工具 (CLI) ===")
