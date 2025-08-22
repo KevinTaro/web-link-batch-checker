@@ -10,13 +10,15 @@ import pandas as pd
 
 
 async def get_webpage_links(session, url, timeout=10, retries=2):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
-    for attempt in range(retries):
+    import logging
+    max_retries = max(retries, 5)
+    for attempt in range(max_retries):
         try:
-            async with session.get(url, headers=headers, timeout=timeout) as response:
+            async with session.get(url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }, timeout=timeout) as response:
                 if response.status != 200:
+                    logging.warning(f"{url} 回應狀態碼 {response.status}")
                     return []
                 text = await response.text()
                 soup = BeautifulSoup(text, 'html.parser')
@@ -37,17 +39,34 @@ async def get_webpage_links(session, url, timeout=10, retries=2):
                 for h2_title in h2_titles:
                     data.append([h2_title, '', '', '', h2_title])
                 return data
-        except asyncio.TimeoutError:
-            if attempt < retries - 1:
-                timeout *= 2
+        except asyncio.TimeoutError as e:
+            logging.warning(f"Timeout: {url} (第{attempt+1}次, timeout={timeout})")
+            if attempt < max_retries - 1:
+                timeout = min(timeout * 2, 120)
+                await asyncio.sleep(2 + attempt)
                 continue
             return []
-        except aiohttp.ClientError:
-            if attempt < retries - 1:
-                await asyncio.sleep(1)
+        except aiohttp.ClientError as e:
+            logging.warning(f"ClientError: {url} (第{attempt+1}次) {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
                 continue
             return []
-        except Exception:
+        except Exception as e:
+            # WinError 64 處理
+            if hasattr(e, 'winerror') and e.winerror == 64:
+                logging.warning(f"WinError 64: {url} (第{attempt+1}次) {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2)
+                    continue
+                return []
+            if '[WinError 64]' in str(e):
+                logging.warning(f"WinError 64: {url} (第{attempt+1}次) {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2)
+                    continue
+                return []
+            logging.error(f"其他例外: {url} (第{attempt+1}次) {e}")
             return []
 
 def save_to_csv(data, filename):
@@ -151,8 +170,9 @@ async def batch_grab(urls):
     """
     非同步批次抓取，urls 為網址 list
     """
+    # 降低同時連線數，減少端口負載與 timeout 誤判
+    connector = aiohttp.TCPConnector(limit=8, ssl=False)
     csv_files = []
-    connector = aiohttp.TCPConnector(limit=32, ssl=False)
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [get_webpage_links(session, url, timeout=10, retries=3) for url in urls]
         results = await asyncio.gather(*tasks)

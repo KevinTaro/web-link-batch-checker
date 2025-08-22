@@ -71,30 +71,51 @@ import os
 
 
 async def check_url(session, url, timeout=5, retries=2):
-    for attempt in range(retries):
+    import logging
+    max_retries = max(retries, 5)
+    for attempt in range(max_retries):
         try:
             async with session.get(url, timeout=timeout) as resp:
                 if resp.status == 200:
                     return 'OK'
                 else:
+                    logging.warning(f"{url} 回應狀態碼 {resp.status}")
                     return f'HTTP {resp.status}'
-        except asyncio.TimeoutError:
-            if attempt < retries - 1:
-                timeout *= 2  # 慢網站自動延長 timeout
+        except asyncio.TimeoutError as e:
+            logging.warning(f"Timeout: {url} (第{attempt+1}次, timeout={timeout})")
+            if attempt < max_retries - 1:
+                timeout = min(timeout * 2, 120)
+                await asyncio.sleep(2 + attempt)
                 continue
             return 'Timeout'
         except aiohttp.ClientError as e:
-            if attempt < retries - 1:
-                await asyncio.sleep(1)
+            logging.warning(f"ClientError: {url} (第{attempt+1}次) {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
                 continue
             return str(e)
         except Exception as e:
+            # WinError 64 處理
+            if hasattr(e, 'winerror') and e.winerror == 64:
+                logging.warning(f"WinError 64: {url} (第{attempt+1}次) {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2)
+                    continue
+                return 'WinError 64'
+            if '[WinError 64]' in str(e):
+                logging.warning(f"WinError 64: {url} (第{attempt+1}次) {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2)
+                    continue
+                return 'WinError 64'
+            logging.error(f"其他例外: {url} (第{attempt+1}次) {e}")
             return str(e)
 
 
 async def batch_check_urls(urls, timeout=5, retries=2):
+    # 降低同時連線數，減少端口負載與 timeout 誤判
+    connector = aiohttp.TCPConnector(limit=8, ssl=False)
     results = {}
-    connector = aiohttp.TCPConnector(limit=64, ssl=False)
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [check_url(session, url, timeout=timeout, retries=retries) for url in urls]
         responses = await asyncio.gather(*tasks)
