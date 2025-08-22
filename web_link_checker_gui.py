@@ -65,8 +65,29 @@ class WebLinkCheckerGUI:
                 self.result_text.see(tk.END)
             if status:
                 self.status.config(text=status)
-                # 若流程已取消，恢復按鈕
+        current_status = self.status.cget('text')
+        # 動畫只啟動一次
+        if (current_status.startswith('狀態：正在檢查網址') or current_status.startswith('狀態：正在批次抓取')):
+            if not hasattr(self, 'animating') or not self.animating:
+                self.animating = True
+                self._animate_status(0)
+        else:
+            self.animating = False
         self.root.after(100, self.process_queue)
+
+    def animate_status_text(self, base_text, idx):
+        dots = ['', '.', '..', '...']
+        self.status.config(text=f'{base_text}{dots[idx % 4]}')
+        self.root.update_idletasks()
+
+    def _animate_status(self, idx):
+        if getattr(self, 'animating', False):
+            current_status = self.status.cget('text')
+            if current_status.startswith('狀態：正在檢查網址'):
+                self.animate_status_text('狀態：正在檢查網址', idx)
+            elif current_status.startswith('狀態：正在批次抓取'):
+                self.animate_status_text('狀態：正在批次抓取', idx)
+            self.root.after(1000, lambda: self._animate_status(idx + 1))
 
     def get_latest_file(self, folder):
         if os.path.exists(folder):
