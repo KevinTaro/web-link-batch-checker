@@ -98,3 +98,26 @@ pip install pandas aiohttp openpyxl beautifulsoup4 requests
 
 -   若遇大量 timeout，可適度調高重試次數或延長 timeout，並減少同時執行數（limit）。
 -   相關參數可於 `web_grab_tool.py` 及 `xlsx_address_check_tool.py` 內調整。
+
+## 使用方式
+
+1. 安裝 Python 3 與必要套件（如 aiohttp、openpyxl、pandas）。
+2. 執行 `web_link_checker_gui.py` 進行批次抓取與檢查。
+
+## 免安裝可執行檔
+
+-   可用 PyInstaller 打包成單一 .exe 檔案：
+    ```
+    pyinstaller --onefile --noconsole --name Web_Link_Checker web_link_checker_gui.py
+    ```
+-   打包後於 `dist/Web_Link_Checker.exe`，可直接分發給使用者。
+-   請務必將 `output` 資料夾（含 checked, csv, xlsx 子資料夾）一併複製到分發目錄，否則程式無法正常存取結果。
+
+## .gitignore 說明
+
+-   已排除 PyInstaller 產生的 dist、build、.spec、**pycache** 及 output 資料夾。
+
+## 注意事項
+
+-   output 資料夾為結果存放處，請勿刪除。
+-   若要乾淨分發，請將 dist 資料夾與 output 資料夾一同壓縮。
